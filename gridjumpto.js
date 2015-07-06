@@ -10,7 +10,8 @@
 **		
 **		
 **		Modifications:
-**		
+**			07/06/2015 - Fixed bug in Firefox (was using innerText
+**			             instead of textContent).
 **		
 **		
 **		
@@ -169,9 +170,16 @@ function VicWidgetJumptoAddLinks( parms, parentNode ){
 					
 					var fieldName = parms.properties.FieldName;        // FieldName property of widget
 					var thisFieldValue = '';                           // Will store the value of the current field while looping
-					var checkChar = this.innerText.charAt(0).toUpperCase();       // The letter for the current element
+					var checkChar;
 					var thisChar = '';                                 // Will store the first character of the field while looping
 					var thisGrid = getObj(parms.properties.GridName);  // Reference to the PUI grid object
+					
+					if (this.textContent)
+						checkChar = this.textContent.charAt(0).toUpperCase();       // The letter for the current element
+					else if (this.innerText)
+						checkChar = this.innerText.charAt(0).toUpperCase();
+					else
+						checkChar = this.innerHTML.charAt(0).toUpperCase();
 					
 					// Loop until the field is undefined.
 					var LoopControl = true;
