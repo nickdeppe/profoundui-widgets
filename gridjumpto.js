@@ -1,5 +1,5 @@
-/* ****************************************************************
-**	widget: Grid Jumpto
+/* **********************************************************************************************
+**	widget: Grid Jumpto v2.0
 **
 **		Provides functionality to quickly jump to positions in a 
 **		grid object based on the first character of
@@ -10,14 +10,15 @@
 **		
 **		
 **		Modifications:
-**			07/06/2015 - Fixed bug in Firefox (was using innerText
-**			             instead of textContent).
-**		
-**		
-**		
-**		
+**			07/06/2015 - Fixed bug in Firefox (was using innerText instead of textContent).
+**		    09/14/2015 - Modified the search algorithm for an anchor element to use the actual
+**			             grid row count
+**			09/15/2015 - Added functionality for Search text box.  This includes a new property
+**			             UseSearchBox.  If this property is set to "true", then a text box will
+**			             appear below the list of links that will allow the user to type in a 
+**			             value to search in the grid.
 **
-**************************************************************** */
+********************************************************************************************* */
 
 
 /*-----------------------------------------------------------------
@@ -48,7 +49,13 @@
 **		  + "-text", ie "jumpto-text".
 **		* The links will be named the parent class + "-link", 
 **		  ie "jumpto-link".
-**		
+**	
+**	6)  (Optional) Set UseSearchBox to "true" to add a text box
+**	    to allow the user to search for values in the grid.
+**	    Additionally, set SearchBoxText to define the text that
+**	    should appear next to the search box.
+**	
+**	
 **	LIMITATIONS:
 **		
 **	1)	This will not work with page-at-a-time subfiles.  The 
@@ -86,6 +93,18 @@
 
 
 
+function VicWidgetJumptoRecreate ( parms ) {
+	// Recreate the object
+	// First, remove all child nodes from the dom object
+	var myNode = parms.dom.firstChild;
+	while ( myNode.firstChild ) {
+		myNode.removeChild(myNode.firstChild);
+	}
+	VicWidgetJumptoAddLinks(parms, myNode);
+}
+
+
+
 /*
 **	function: VicWidgetJumptoAddLinks - Function adds all hyperlinks to a parent Grid Jumpto element.
 **		Function used to build the widget dom elements
@@ -100,9 +119,15 @@ function VicWidgetJumptoAddLinks( parms, parentNode ){
 	}
 	
 	// Variables that will hold the current elements in the loop.
+	var div1Element;
+	var div2Element;
 	var anchorElement;
 	var spanElement;
+	var inputElement;
 	var textElement;
+
+	// create the first div element
+	div1Element = document.createElement("DIV");
 	
 	// Remove white space from value
 	var CharArray = parms.properties.value.replace(/\s+/g, '');
@@ -113,9 +138,8 @@ function VicWidgetJumptoAddLinks( parms, parentNode ){
 	
 	// Create the description text element, if set
 	if (parms.properties.DescriptionText) {
-		var spanElement = document.createElement("SPAN");
+		spanElement = document.createElement('SPAN');
 		textElement = document.createTextNode( parms.properties.DescriptionText );
-		spanElement.appendChild(textElement);
 		if (!parms.properties['css class'])
 			spanElement.className = "jumpto-text";
 		else {
@@ -125,9 +149,12 @@ function VicWidgetJumptoAddLinks( parms, parentNode ){
 				if (prop.substring(0,9) == 'css class')
 					spanElement.className += ' ' + parms.properties[prop] + "-text";
 			}
+			console.log(spanElement.className);
 		}
-		parentNode.appendChild(spanElement);
+		spanElement.appendChild(textElement);
+		div1Element.appendChild(spanElement);
 	}
+	
 	
 	// Loop through each character in the array and add a hyperlink for each.
 	for ( var i = 0; i < TotalChars; i++ ) {
@@ -140,33 +167,38 @@ function VicWidgetJumptoAddLinks( parms, parentNode ){
 		anchorElement.href="javascript:void(0)";
 
 		// Set class name
-		if (!parms.properties['css class'])
+		if (!parms.properties['css class']) {
 			anchorElement.className = "jumpto-link";
-		else {
+			div1Element.className = "jumpto-link-wrapper";
+		} else {
 			// loop through all properties, in case there are multiple classes
 			anchorElement.className = '';
+			div1Element.className = '';
 			for (var prop in parms.properties) {
-				if (prop.substring(0,9) == 'css class')
+				if (prop.substring(0,9) == 'css class') {
 					anchorElement.className += ' ' + parms.properties[prop] + "-link";
+					div1Element.className += ' ' + parms.properties[prop] + "-link-wrapper";
+				}
 			}
 		}
 		
 		if ( !parms.design ) {
 			
+			// Set functionality when one of the buttons is pressed
 			anchorElement.onclick = function() {
+				
+				// Make sure the correct parms are available
+				if ( !parms.properties.GridName ) {
+					console.log("GridJumpTo: Grid name not set.");
+					return;
+				}
+				if ( !parms.properties.FieldName ) {
+					console.log("GridJumpTo: Field name not set.");
+					return;
+				}
 				
 				// This happens when one of the letters are clicked
 				if ( parms.properties.GridName ) {
-					
-					// Make sure the correct parms are available
-					if ( !parms.properties.GridName ) {
-						console.log("GridJumpTo: Grid name not set.");
-						return;
-					}
-					if ( !parms.properties.FieldName ) {
-						console.log("GridJumpTo: Field name not set.");
-						return;
-					}
 					
 					var fieldName = parms.properties.FieldName;        // FieldName property of widget
 					var thisFieldValue = '';                           // Will store the value of the current field while looping
@@ -182,11 +214,9 @@ function VicWidgetJumptoAddLinks( parms, parentNode ){
 						checkChar = this.innerHTML.charAt(0).toUpperCase();
 					
 					// Loop until the field is undefined.
-					var LoopControl = true;
-					var currRow = 0;
 					var prevRow = 1;
-					while ( LoopControl ) {
-						++currRow;
+					var totalRows = thisGrid.grid.getRecordCount();
+					for (var currRow = 1; currRow <= totalRows; currRow++ ) {
 						thisFieldValue = thisGrid.grid.getDataValue( currRow, fieldName );
 						if (!thisFieldValue) {
 							thisGrid.grid.scrollToRow(prevRow);
@@ -208,10 +238,119 @@ function VicWidgetJumptoAddLinks( parms, parentNode ){
 
 		}
 
-		parentNode.appendChild(anchorElement);
+		div1Element.appendChild(anchorElement);
 
 	}
-
+	
+	parentNode.appendChild(div1Element);
+	
+	
+	
+	// Create the search text box if specified
+	if(parms.properties.UseSearchBox == 'true') {
+		div2Element = document.createElement("DIV");
+		if (parms.properties.SearchBoxText) {
+			textElement = document.createTextNode( parms.properties.SearchBoxText );
+		} else {
+			textElement = document.createTextNode( "Search: " );
+		}
+		var labelElement = document.createElement('LABEL');
+		labelElement.appendChild(textElement);
+		var inputElement = document.createElement('INPUT');
+		inputElement.type = 'text';
+		if ( !parms.design ) {
+			inputElement.onkeyup = function() {
+				// Function to compare for equals (take substring of length of shortest value)
+				var searchCompareEqual = function(value1, value2) {
+					var minLength = value1.length;
+					if (value1.substring(0, minLength).toUpperCase() == value2.substring(0, minLength).toUpperCase())
+						return true;
+					else
+						return false;
+				};
+				// Function to compare for greater than
+				var searchCompareGreater = function(value1, value2) {
+					// converts ASCII character to EBCDIC decimal code (ugh)
+					var convTable = {0:0, 1:1, 2:2, 3:3, 4:55, 5:45, 6:46, 7:47, 8:22, 9:5, 10:37, 11:11, 12:12, 13:13, 14:14, 15:15, 16:16, 17:17, 18:18, 19:19, 20:60, 21:61, 22:50, 23:38, 24:24, 25:25, 26:63, 27:39, 28:28, 29:29, 30:30, 31:31, 32:64, 33:79, 34:127, 35:123, 36:91, 37:108, 38:80, 39:125, 40:77, 41:93, 42:92, 43:78, 44:107, 45:96, 46:75, 47:97, 48:240, 49:241, 50:242, 51:243, 52:244, 53:245, 54:246, 55:247, 56:248, 57:249, 58:122, 59:94, 60:76, 61:126, 62:110, 63:111, 64:124, 65:193, 66:194, 67:195, 68:196, 69:197, 70:198, 71:199, 72:200, 73:201, 74:209, 75:210, 76:211, 77:212, 78:213, 79:214, 80:215, 81:216, 82:217, 83:226, 84:227, 85:228, 86:229, 87:230, 88:231, 89:232, 90:233, 91:74, 92:224, 93:90, 94:95, 95:109, 96:121, 97:129, 98:130, 99:131, 100:132, 101:133, 102:134, 103:135, 104:136, 105:137, 106:145, 107:146, 108:147, 109:148, 110:149, 111:150, 112:151, 113:152, 114:153, 115:162, 116:163, 117:164, 118:165, 119:166, 120:167, 121:168, 122:169, 123:192, 124:106, 125:208, 126:161, 127:7, 128:32, 129:33, 130:34, 131:35, 132:36, 133:21, 134:6, 135:23, 136:40, 137:41, 138:42, 139:43, 140:44, 141:9, 142:10, 143:27, 144:48, 145:49, 146:26, 147:51, 148:52, 149:53, 150:54, 151:8, 152:56, 153:57, 154:58, 155:59, 156:4, 157:20, 158:62, 159:225, 160:65, 161:66, 162:67, 163:68, 164:69, 165:70, 166:71, 167:72, 168:73, 169:81, 170:82, 171:83, 172:84, 173:85, 174:86, 175:87, 176:88, 177:89, 178:98, 179:99, 180:100, 181:101, 182:102, 183:103, 184:104, 185:105, 186:112, 187:113, 188:114, 189:115, 190:116, 191:117, 192:118, 193:119, 194:120, 195:128, 196:138, 197:139, 198:140, 199:141, 200:142, 201:143, 202:144, 203:154, 204:155, 205:156, 206:157, 207:158, 208:159, 209:160, 210:170, 211:171, 212:172, 213:173, 214:174, 215:175, 216:176, 217:177, 218:178, 219:179, 220:180, 221:181, 222:182, 223:183, 224:184, 225:185, 226:186, 227:187, 228:188, 229:189, 230:190, 231:191, 232:202, 233:203, 234:204, 235:205, 236:206, 237:207, 238:218, 239:219, 240:220, 241:221, 242:222, 243:223, 244:234, 245:235, 246:236, 247:237, 248:238, 249:239, 250:250, 251:251, 252:252, 253:253, 254:254, 255:255};
+					var AsciiToEbcdic = function(inChar) {
+						// The conversion table is an object that links the ascii decimal code to ebcdic decimal code
+						var currChar = inChar.charCodeAt(0);
+						var EbcdicVal = convTable[currChar];
+						return parseInt(EbcdicVal);
+					}
+					var minLength = (value1.length < value2.length) ? value1.length : value2.length;
+					var val1Ebcdic;
+					var val2Ebcdic;
+					// Loop through each character and compare the EBCDIC value
+					// If the EBCDIC value is less than, then return false
+					for ( var i = 0; i < minLength; i++ ) {
+						val1Ebcdic = AsciiToEbcdic(value1.substring(i, i+1));
+						val2Ebcdic = AsciiToEbcdic(value2.substring(i, i+1));
+						if (val1Ebcdic < val2Ebcdic)
+							return false;
+						else if ( val1Ebcdic == val2Ebcdic )
+							continue;
+						else if ( val1Ebcdic > val2Ebcdic )
+							return true;
+					}
+				}
+				// While the user types, move to the spot in the grid
+				// Make sure the correct parms are available
+				if ( !parms.properties.GridName ) {
+					console.log("GridJumpTo: Grid name not set.");
+					return;
+				}
+				if ( !parms.properties.FieldName ) {
+					console.log("GridJumpTo: Field name not set.");
+					return;
+				}
+				if ( parms.properties.GridName && parms.properties.FieldName ) {
+					var thisGrid = getObj(parms.properties.GridName);  // Reference to the PUI grid object					
+					var fieldName = parms.properties.FieldName;        // FieldName property of widget
+					// Loop until the field is undefined.
+					var prevRow = 1;
+					var totalRows = thisGrid.grid.getRecordCount();
+					var fieldSubstring;
+					var fieldValue;
+					var searchValue = inputElement.value.toUpperCase();
+					for (var currRow = 1; currRow <= totalRows; currRow++ ) {
+						fieldValue = thisGrid.grid.getDataValue( currRow, fieldName );
+						if ( fieldValue.length ) {
+							fieldSubstring = fieldValue.substring(0, searchValue.length).toUpperCase();
+							if ( searchCompareEqual(searchValue, fieldSubstring) ) {
+								thisGrid.grid.scrollToRow( currRow );
+								break;
+							} else if ( searchCompareGreater( fieldSubstring, searchValue) ) {
+								thisGrid.grid.scrollToRow( currRow );
+								break;
+							}
+						}
+					}
+				}
+				return false;
+			}
+		}
+		if(!parms.properties['css class']) {
+			labelElement.className = 'jumpto-search-label';
+			inputElement.className = 'jumpto-search-input';
+			div2Element.className = 'jumpto-search-wrapper';
+		} else {
+			// loop through all properties, in case there are multiple classes
+			labelElement.className = '';
+			inputElement.className = '';
+			div2Element.className = '';
+			for (var prop in parms.properties) {
+				if (prop.substring(0,9) == 'css class') {
+					labelElement.className += ' ' + parms.properties[prop] + '-search-label';
+					inputElement.className += ' ' + parms.properties[prop] + '-search-input';
+					div2Element.className += ' ' + parms.properties[prop] + '-search-wrapper';
+				}
+			}
+		}
+		labelElement.appendChild(inputElement);
+		div2Element.appendChild(labelElement);
+		parentNode.appendChild(div2Element);
+	}
 }
 
 
@@ -272,83 +411,20 @@ pui.widgets.add({
 			}
 		  
 		},
-		
-		
 		"css class": function(parms) {
-
-			var textClassNames = '';
-			var linkClassNames = '';
-		
-			if (!parms.properties['css class']) {
-				textClassNames = "jumpto-text";
-				linkClassNames = "jumpto-link";
-			} else {
-				// loop through all properties, in case there are multiple classes
-				textClassNames = '';
-				linkClassNames = '';
-				for (var prop in parms.properties) {
-					if (prop.substring(0,9) == 'css class') {
-						textClassNames += ' ' + parms.properties[prop] + "-text";
-						linkClassNames += ' ' + parms.properties[prop] + "-link";
-					}
-				}
-			}
-			
-			parms.dom.className = parms.properties['css class'];
-			childElements = parms.dom.getElementsByTagName('A');
-			for( var i = 0; i < childElements.length; i++) {
-				childElements[i].className = parms.properties['css class'] + '-link';
-			}
+			VicWidgetJumptoRecreate(parms);
 		},
 		"value":function(parms) {
-			// Recreate the object
-			// First, remove all child nodes from the dom object
-			var myNode = parms.dom.firstChild;
-			while ( myNode.firstChild ) {
-				myNode.removeChild(myNode.firstChild);
-			}
-			VicWidgetJumptoAddLinks(parms, myNode);
+			VicWidgetJumptoRecreate(parms);
 		},
 		"DescriptionText": function(parms) {
-			if (!parms.properties.DescriptionText)
-			{
-				// remove the elements
-				var mySpan = parms.dom.firstChild.getElementsByTagName("SPAN");
-				console.log(mySpan.length);
-				if (mySpan.length > 0){
-					for( var i = 0; i < mySpan.length; i++){
-						mySpan[0].parentNode.removeChild(mySpan[0]);
-					}
-				}
-				return;
-			}
-			
-			var classNames = '';
-			if (!parms.properties['css class'])
-				classNames = "jumpto-text";
-			else {
-				// loop through all properties, in case there are multiple classes
-				classNames = '';
-				for (var prop in parms.properties) {
-					if (prop.substring(0,9) == 'css class')
-						classNames += ' ' + parms.properties[prop] + "-text";
-				}
-			}
-
-			
-			var myNode = parms.dom;
-			var mySpan = parms.dom.firstChild.getElementsByTagName("SPAN");
-			if (mySpan.length > 0) {
-				for (var i = 0; i < mySpan.length; i++ ) {
-					mySpan[i].textContent = parms.properties.DescriptionText;
-				}
-			} else {
-				mySpan = document.createElement("SPAN");
-				if (parms.properties['css class'])
-					mySpan.className = classNames;
-				mySpan.textContent = parms.properties.DescriptionText;
-				parms.dom.firstChild.insertBefore( mySpan, parms.dom.firstChild.childNodes[0] );
-			}
+			VicWidgetJumptoRecreate(parms);
+		},
+		"UseSearchBox" : function(parms) {
+			VicWidgetJumptoRecreate(parms);
+		},
+		"SearchBoxText" : function(parms) {
+			VicWidgetJumptoRecreate(parms);
 		}
 	}
   
@@ -390,7 +466,24 @@ pui.addCustomProperty({
 pui.addCustomProperty({
 	name: "DescriptionText",
 	type: "long",
-	help: "If this is set, text will appear at the beginning of the element.",
+	help: "If this is set, text will appear at the left of the links.",
+	controls: ["grid jumpto"],
+	category: "Field Settings"
+});
+
+
+pui.addCustomProperty({
+	name: "UseSearchBox",
+	type: "boolean",
+	help: "If set to true, displays a search box that will allow users to type a value to jump to in the grid.",
+	controls: ["grid jumpto"],
+	category: "Field Settings"
+});
+
+pui.addCustomProperty({
+	name: "SearchBoxText",
+	type: "long",
+	help: "If this is set, text will appear at the left of the search text box.",
 	controls: ["grid jumpto"],
 	category: "Field Settings"
 });
@@ -409,17 +502,18 @@ pui.toolbox.add({
 	icon: "/profoundui/proddata/images/icons/window.png",
 
 	// this determines the look of the drag/drop proxy as we drag the widget element off the toolbox
-	proxyHeight: 20,
+	proxyHeight: 41,
 	proxyWidth: 290,
-	proxyHTML: '<div style="width: 290px; height: 20px;"><span class=" vic_jumpto-text">Jump To:</span><a href="javascript:void(0)" class=" vic_jumpto-link">A</a><a href="javascript:void(0)" class=" vic_jumpto-link">B</a><a href="javascript:void(0)" class=" vic_jumpto-link">C</a><a href="javascript:void(0)" class=" vic_jumpto-link">D</a><a href="javascript:void(0)" class=" vic_jumpto-link">E</a><a href="javascript:void(0)" class=" vic_jumpto-link">F</a><a href="javascript:void(0)" class=" vic_jumpto-link">G</a><a href="javascript:void(0)" class=" vic_jumpto-link">H</a><a href="javascript:void(0)" class=" vic_jumpto-link">I</a><a href="javascript:void(0)" class=" vic_jumpto-link">J</a><a href="javascript:void(0)" class=" vic_jumpto-link">K</a><a href="javascript:void(0)" class=" vic_jumpto-link">L</a><a href="javascript:void(0)" class=" vic_jumpto-link">M</a><a href="javascript:void(0)" class=" vic_jumpto-link">N</a><a href="javascript:void(0)" class=" vic_jumpto-link">O</a><a href="javascript:void(0)" class=" vic_jumpto-link">P</a><a href="javascript:void(0)" class=" vic_jumpto-link">Q</a><a href="javascript:void(0)" class=" vic_jumpto-link">R</a><a href="javascript:void(0)" class=" vic_jumpto-link">S</a><a href="javascript:void(0)" class=" vic_jumpto-link">T</a><a href="javascript:void(0)" class=" vic_jumpto-link">U</a><a href="javascript:void(0)" class=" vic_jumpto-link">V</a><a href="javascript:void(0)" class=" vic_jumpto-link">W</a><a href="javascript:void(0)" class=" vic_jumpto-link">X</a><a href="javascript:void(0)" class=" vic_jumpto-link">Y</a><a href="javascript:void(0)" class=" vic_jumpto-link">Z</a></div>',
-
+	proxyHTML: '<div><div class=" jumpto-link-wrapper"><span class=" jumpto-text">Jump To: </span><a href="javascript:void(0)" class=" jumpto-link">A</a><a href="javascript:void(0)" class=" jumpto-link">B</a><a href="javascript:void(0)" class=" jumpto-link">C</a><a href="javascript:void(0)" class=" jumpto-link">D</a><a href="javascript:void(0)" class=" jumpto-link">E</a><a href="javascript:void(0)" class=" jumpto-link">F</a><a href="javascript:void(0)" class=" jumpto-link">G</a><a href="javascript:void(0)" class=" jumpto-link">H</a><a href="javascript:void(0)" class=" jumpto-link">I</a><a href="javascript:void(0)" class=" jumpto-link">J</a><a href="javascript:void(0)" class=" jumpto-link">K</a><a href="javascript:void(0)" class=" jumpto-link">L</a><a href="javascript:void(0)" class=" jumpto-link">M</a><a href="javascript:void(0)" class=" jumpto-link">N</a><a href="javascript:void(0)" class=" jumpto-link">O</a><a href="javascript:void(0)" class=" jumpto-link">P</a><a href="javascript:void(0)" class=" jumpto-link">Q</a><a href="javascript:void(0)" class=" jumpto-link">R</a><a href="javascript:void(0)" class=" jumpto-link">S</a><a href="javascript:void(0)" class=" jumpto-link">T</a><a href="javascript:void(0)" class=" jumpto-link">U</a><a href="javascript:void(0)" class=" jumpto-link">V</a><a href="javascript:void(0)" class=" jumpto-link">W</a><a href="javascript:void(0)" class=" jumpto-link">X</a><a href="javascript:void(0)" class=" jumpto-link">Y</a><a href="javascript:void(0)" class=" jumpto-link">Z</a></div><div class=" jumpto-search-wrapper"><label class=" jumpto-search-label">Search: <input type="text" class=" jumpto-search-input"></label></div></div>',
 
 	// additional default property values can be specified here
 	defaults: {
 		"DescriptionText": "Jump To: ",
 		"GridName": "Grid1",
 		"value": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-		"css class": "jumpto"
+		"css class": "jumpto",
+		"UseSearchBox" : "true",
+		"SearchBoxText" : "Search: "
 	}  
   
 });
